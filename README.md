@@ -3,3 +3,7 @@ Description: One adafruit neopixel LED was used along with a light sensor. The l
 
 
 This project was started and completed during April, 2026.
+
+
+Link to google folder with demonstration video:
+https://drive.google.com/drive/folders/156aWlhFTW4eIrydw6HugNmuXWG7yEjwQ?usp=sharing
