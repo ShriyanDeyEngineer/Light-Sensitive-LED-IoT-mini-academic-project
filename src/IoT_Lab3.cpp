@@ -1,128 +1,144 @@
 // Include Particle Device OS APIs
 #include "Particle.h"
 #include "neopixel.h"
-
 // Let Device OS manage the connection to the Particle Cloud
 SYSTEM_MODE(AUTOMATIC);
-
 // Run the application and system concurrently in separate threads
 SYSTEM_THREAD(ENABLED);
-
 // Show system, cloud connectivity, and application logs over USB
 // View logs with CLI using 'particle serial monitor --follow'
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
-int tempReading = 0;
-double celciusReading = 0;
-double fahrenheitReading = 0;
-double targetTemp = 73.0;
-
-
-#define COOL 0
-#define OFF 1
-#define HEAT 2
-
-#define REDALERT 3
-bool havePublishedRedAlert = false;
-
-int mode = OFF;
-
-int setModeFromString(String inputString);
-int setTargetTempFromString(String inputString);
-
+//Set up the strip object with the number of pixels (LED's), pin, and type of strip from the Adafruit_NeoPixel class/library
 #define PIXEL_PIN SPI
-Adafruit_NeoPixel light = Adafruit_NeoPixel(1, PIXEL_PIN, WS2812);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXEL_PIN, WS2812);
 
-// setup() runs once, when the device is first turned on
-void setup() 
+int lightReading;
+double lightLevel;
+int brightness;
+
+void setup()
 {
-  Particle.variable("temperatureReading", fahrenheitReading);
-  Particle.variable("cV_targetTemp", targetTemp);
-
-  Particle.function("cF_setMode", setModeFromString);
-  Particle.function("cF_setTargetTemp", setTargetTempFromString);
-
-  light.begin();
-
-  //start with default white light color for the LED
-  light.setPixelColor(0, light.Color(127, 127, 127)); 
-  light.show();
+  //Open the serial port for communication with the computer
+  Serial.begin(9600);
+  //Setup D7 pin to output a heartbeat
+  pinMode(D7, OUTPUT);
+  //initialize the stip object that was created above
+  
+  strip.begin();
 }
 
-
-// loop() runs over and over again, as quickly as it can execute.
-void loop() 
+void loop()
 {
-  tempReading = analogRead(A1);
-
-  Serial.print("Analog voltage reading: ");
-  Serial.println(tempReading);
-
-  celciusReading = (tempReading - 620) * 0.0806; //convert ADC reading to celcius reading
-  Serial.print("Celsius reading: ");
-  Serial.println(celciusReading);
-
-  fahrenheitReading = 1.8 * celciusReading + 32; //convert celcius reading to fahrenheit reading
-  Serial.print("Fahrenheit reading: ");
-  Serial.println(fahrenheitReading);
-  Serial.println("----------------------------------");
-
-  Particle.publish("TEMPevent", celciusReading);
-  delay(3000); //wait three seconds before next reading
+  //Heartbeat, show we are alive
+  digitalWrite(D7, HIGH);
+  delay(250);
+  //Read data from analog pins (which returns number from 0 to 4095)
+  lightReading = analogRead(A1);
+  
+  //Convert the data to a voltage and print the data to the serial port
+  lightLevel = lightReading / 4095.0 * 3.3;
+  Serial.print("Current light reading (0-4095): ");
+  Serial.print(lightReading);
+  Serial.println("|");
+  Serial.print("Current light level (Volts): ");
+  Serial.print(lightLevel);
+  Serial.println("|");
+  //Set the brightness of the LED based on the light level (the brighter the light, the dimmer the LED)
+  //The sensor reads lower numbers for brighter light, so the conversion should just be:
+  brightness = lightReading / 4095.0 * 255; //This will ensure the brightness of the LED is less when the light reading is low (surrounding light is bright)
+  
+  Serial.print("Current brightness level (0-255): ");
+  Serial.print(brightness);
+  Serial.println("|");
+  Serial.println("----------------------------------------");
+  
+  //Input the brightness variable in only one of the GRB parameters. The brightness value will change how dim that color is, controlling the overall brighteness of the LED
+  strip.setPixelColor(0, strip.Color(brightness, 0, brightness));
+  strip.show(); //This will update the LED to the color that was set above
+  //Wait 1 second before the next reading
+  delay(1000);
+  
+  //Heartbeat, show we are alive
+  digitalWrite(D7, LOW);
+  delay(250);
 }
 
+Version 2 (Thresholds):
+// Include Particle Device OS APIs
+#include "Particle.h"
+#include "neopixel.h"
+// Let Device OS manage the connection to the Particle Cloud
+SYSTEM_MODE(AUTOMATIC);
+// Run the application and system concurrently in separate threads
+SYSTEM_THREAD(ENABLED);
+// Show system, cloud connectivity, and application logs over USB
+// View logs with CLI using 'particle serial monitor --follow'
+SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
-int setModeFromString(String inputString)
+//Set up the strip object with the number of pixels (LED's), pin, and type of strip from the Adafruit_NeoPixel class/library
+#define PIXEL_PIN SPI
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIXEL_PIN, WS2812);
+
+int lightReading;
+double lightLevel;
+int brightness;
+
+void setup()
 {
-  if(inputString == "Cool")
-  {
-    mode = COOL;
-    light.setPixelColor(0, light.Color(0, 0, 127)); //Blue to symbolize cool mode
-    light.show();
-    return 0;
-  }
-  else if(inputString == "Off")
-  {
-    mode = OFF;
-    light.setPixelColor(0, light.Color(127, 127, 127)); //White to symbolize off mode
-    light.show();
-    return 1;
-  }
-  else if(inputString == "Heat")
-  {
-    mode = HEAT;
-    light.setPixelColor(0, light.Color(127, 254, 0)); //Orange/Yellow to symbolize heat mode
-    light.show();
-    return 2;
-  }
-  else if(inputString == "REDALERT" && havePublishedRedAlert == false)
-  {
-    mode = REDALERT;
-    havePublishedRedAlert = true;
-
-    //Publish an event to the Particle Cloud to notify that the system is in red alret mode
-    Particle.publish("RED ALERT DETECTED");
-
-    light.setPixelColor(0, light.Color(0, 127, 0)); //Red to symbolize red alert mode
-    light.show();
-    return 3;
-  }
-  else
-  {
-    return -1;
-  }
+//Open the serial port for communication with the computer
+Serial.begin(9600);
+//Setup D7 pin to output a heartbeat
+pinMode(D7, OUTPUT);
+//initialize the stip object that was created above
+strip.begin();
 }
 
-int setTargetTempFromString(String inputString)
+void loop()
 {
-  if(inputString.toFloat() < 50 || inputString.toFloat() > 90)
+  //Heartbeat, show we are alive
+  digitalWrite(D7, HIGH);
+  delay(250);
+  //Read data from analog pins (which returns number from 0 to 4095)
+  lightReading = analogRead(A1);
+  
+  //Convert the data to a voltage and print the data to the serial port
+  lightLevel = lightReading / 4095.0 * 3.3;
+  
+  Serial.print("Current light reading (0-4095): ");
+  Serial.print(lightReading);
+  Serial.println("|");
+  Serial.print("Current light level (Volts): ");
+  Serial.print(lightLevel);
+  Serial.println("|");
+  //Set the brightness of the LED based on the light level (the brighter the light, the dimmer the LED)
+  //The sensor reads lower numbers for brighter light, so the conversion should just be:
+  brightness = lightReading / 4095.0 * 255; //This will ensure the brightness of the LED is less when the light reading is low (surrounding light is bright)
+  //Set thresholds to make the brightness change more obvious (nearly off when environment is bright, and nearly full brightness when environment is dark)
+  if(lightLevel <= 2.3)
   {
-    targetTemp = 70.0;
-    return 0;
+    brightness /= 10; //Set to 10% of the calculated brightness for better response to brighter enivronment
   }
-  else
+  else if(lightLevel > 2.3)
   {
-    targetTemp = inputString.toFloat();
-    return 0;
+    brightness = brightness + (brightness / 2); //Set to 150% of the calculated brightness for better response to darker environment
+    if(brightness > 255) //Cap the brightness at 255, which is the maximum for the LED
+    {
+      brightness = 255;
+    }
   }
+  Serial.print("Current brightness level (0-255): ");
+  Serial.print(brightness);
+  Serial.println("|");
+  Serial.println("----------------------------------------");
+  //Input the brightness variable in only one of the GRB parameters. The brightness value will change how dim that color is, controlling the overall brighteness of the LED
+  strip.setPixelColor(0, strip.Color(brightness, 0, brightness));
+  strip.show(); //This will update the LED to the color that was set above
+  
+  //Wait 1 second before the next reading
+  delay(1000);
+  
+  //Heartbeat, show we are alive
+  digitalWrite(D7, LOW);
+  delay(250);
 }
